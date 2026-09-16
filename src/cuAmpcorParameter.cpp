@@ -387,11 +387,11 @@ void cuAmpcorParameter::setChunkStartPixels()
             mChunkED += windowSizeHeightRawEnlarged;
             if (mChunkED > referenceImageHeight) mChunkED = referenceImageHeight;
             mChunkEA += windowSizeWidthRawEnlarged;
-            if (mChunkEA > referenceImageWidth) mChunkED = referenceImageWidth;
+            if (mChunkEA > referenceImageWidth) mChunkEA = referenceImageWidth;
             sChunkED += searchWindowSizeHeightRaw;
             if (sChunkED > secondaryImageHeight) sChunkED = secondaryImageHeight;
             sChunkEA += searchWindowSizeWidthRaw;
-            if (sChunkEA > secondaryImageWidth) sChunkED = secondaryImageWidth;
+            if (sChunkEA > secondaryImageWidth) sChunkEA = secondaryImageWidth;
             // set the starting pixel and size of the chunk
             referenceChunkStartPixelDown[idxChunk]   = mChunkSD;
             referenceChunkStartPixelAcross[idxChunk] = mChunkSA;
