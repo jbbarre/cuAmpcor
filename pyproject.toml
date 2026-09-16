@@ -17,6 +17,7 @@ grossOffsets = "pycuampcor.examples.grossOffsets:main"
 GeoTiffSample = "pycuampcor.examples.GeoTiffSample:main"
 glacierSample = "pycuampcor.examples.glacierSample:main"
 varyGrossOffsetSample = "pycuampcor.examples.varyGrossOffsetSample:main"
+toLegacyAmpcor = "pycuampcor.examples.toLegacyAmpcor:main"
 
 [tool.scikit-build]
 # optional: set CMake options

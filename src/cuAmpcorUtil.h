@@ -27,6 +27,12 @@ void cuArraysCopyToBatchAbsWithOffset(cuArrays<image_complex_type> *image1, cons
 void cuArraysCopyToBatchWithOffsetR2C(cuArrays<image_real_type> *image1, const int inNX, const int inNY,
     cuArrays<complex_type> *image2, const int *offsetH, const int* offsetW, cudaStream_t stream);
 void cuArraysCopyC2R(cuArrays<complex_type> *image1, cuArrays<real_type> *image2, int strideH, int strideW, cudaStream_t stream);
+// replace non-finite (NaN/Inf) pixels in a raw loaded image chunk with 0 (see cuArraysCopy.cu)
+void cuArraysNanToZero(cuArrays<image_complex_type> *image, const int validSize, cudaStream_t stream);
+void cuArraysNanToZero(cuArrays<image_real_type> *image, const int validSize, cudaStream_t stream);
+// reverse the byte order of a raw loaded image chunk in place, for big-endian source SLCs (see cuArraysCopy.cu)
+void cuArraysByteSwap(cuArrays<image_complex_type> *image, const int validSize, cudaStream_t stream);
+void cuArraysByteSwap(cuArrays<image_real_type> *image, const int validSize, cudaStream_t stream);
 
 // same routine name overloaded for different data type
 // extract data from a large image

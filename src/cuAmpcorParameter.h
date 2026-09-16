@@ -97,12 +97,14 @@ public:
     int referenceImageDataType;        ///< reference image data type, 2=cfloat=complex=float2 1=float
     int referenceImageHeight;          ///< reference image height
     int referenceImageWidth;           ///< reference image width
+    int referenceImageByteOrder;       ///< reference image byte order, 0=native/little-endian 1=big-endian (needs byte-swap)
 
     //secondary image
     std::string secondaryImageName;     ///< secondary SLC image name
     int secondaryImageDataType;         ///< secondary image data type, 2=cfloat=complex=float2 1=float
     int secondaryImageHeight;           ///< secondary image height
     int secondaryImageWidth;            ///< secondary image width
+    int secondaryImageByteOrder;        ///< secondary image byte order, 0=native/little-endian 1=big-endian (needs byte-swap)
 
     // total number of chips/windows
     int numberWindowDown;           ///< number of total windows (down)

@@ -404,6 +404,11 @@ void cuAmpcorProcessorOnePass::loadReferenceChunk()
 
             // load the data from cpu
             referenceImage->loadToDevice((void *)c_referenceChunkRaw->devData, startDown, startAcross, height, width, stream);
+            // undo endianness for a big-endian source SLC before anything else touches it
+            if (param->referenceImageByteOrder)
+                cuArraysByteSwap(c_referenceChunkRaw, height*width, stream);
+            // guard against NaN/Inf pixels in the source SLC poisoning whole correlation windows
+            cuArraysNanToZero(c_referenceChunkRaw, height*width, stream);
 
             //copy the chunk to a batch format (nImages, height, width)
             // if derampMethod = 0 (no deramp), take amplitudes; otherwise, copy complex data
@@ -427,6 +432,11 @@ void cuAmpcorProcessorOnePass::loadReferenceChunk()
 
             // load the data from cpu
             referenceImage->loadToDevice((void *)r_referenceChunkRaw->devData, startDown, startAcross, height, width, stream);
+            // undo endianness for a big-endian source SLC before anything else touches it
+            if (param->referenceImageByteOrder)
+                cuArraysByteSwap(r_referenceChunkRaw, height*width, stream);
+            // guard against NaN/Inf pixels in the source SLC poisoning whole correlation windows
+            cuArraysNanToZero(r_referenceChunkRaw, height*width, stream);
 
             // copy the chunk (real) to a batch format (complex)
             cuArraysCopyToBatchWithOffsetR2C(r_referenceChunkRaw,
@@ -470,6 +480,11 @@ void cuAmpcorProcessorOnePass::loadSecondaryChunk()
                 param->secondaryChunkHeight[idxChunk],
                 param->secondaryChunkWidth[idxChunk],
                 stream);
+            // undo endianness for a big-endian source SLC before anything else touches it
+            if (param->secondaryImageByteOrder)
+                cuArraysByteSwap(c_secondaryChunkRaw, height*width, stream);
+            // guard against NaN/Inf pixels in the source SLC poisoning whole correlation windows
+            cuArraysNanToZero(c_secondaryChunkRaw, height*width, stream);
 
             if(param->derampMethod == 0) {
                 cuArraysCopyToBatchAbsWithOffset(c_secondaryChunkRaw,
@@ -495,6 +510,11 @@ void cuAmpcorProcessorOnePass::loadSecondaryChunk()
                 param->secondaryChunkHeight[idxChunk],
                 param->secondaryChunkWidth[idxChunk],
                 stream);
+            // undo endianness for a big-endian source SLC before anything else touches it
+            if (param->secondaryImageByteOrder)
+                cuArraysByteSwap(r_secondaryChunkRaw, height*width, stream);
+            // guard against NaN/Inf pixels in the source SLC poisoning whole correlation windows
+            cuArraysNanToZero(r_secondaryChunkRaw, height*width, stream);
 
             // convert to the batch format
             cuArraysCopyToBatchWithOffsetR2C(r_secondaryChunkRaw,

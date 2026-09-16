@@ -54,6 +54,12 @@ def createParser():
                         help='Fix the image file path in the XML file. Enable this if input files have been moved.')
     parser.add_argument('--fix-vrt','--fix-image-vrt', dest='fixImageVrt', action='store_true',
                         help='Fix the image file path in the VRT file. Enable this if input files have VRT pointing to non-existing burst files')
+    parser.add_argument('--ref-byte-order', dest='referenceByteOrder', type=str, default='l', choices=['l', 'b'],
+                        help='Byte order of the reference image (l=little-endian/native, b=big-endian, '
+                             'e.g. GAMMA-native FCOMPLEX/SCOMPLEX SLCs) (default: %(default)s).')
+    parser.add_argument('--sec-byte-order', dest='secondaryByteOrder', type=str, default='l', choices=['l', 'b'],
+                        help='Byte order of the secondary image (l=little-endian/native, b=big-endian, '
+                             'e.g. GAMMA-native FCOMPLEX/SCOMPLEX SLCs) (default: %(default)s).')
 
     parser.add_argument('--op','--outprefix','--output-prefix', type=str, dest='outprefix',
                         default='offset', required=True,
@@ -235,10 +241,12 @@ def estimateOffsetField(reference, secondary, inps=None):
     objOffset.referenceImageHeight = length
     objOffset.referenceImageWidth = width
     objOffset.referenceImageDataType = 2 if sar.getDataType().upper().startswith('C')  else 1
+    objOffset.referenceImageByteOrder = 1 if inps.referenceByteOrder == 'b' else 0
     objOffset.secondaryImageName = secondary
     objOffset.secondaryImageHeight = length
     objOffset.secondaryImageWidth = width
     objOffset.secondaryImageDataType = 2 if sim.getDataType().upper().startswith('C') else 1
+    objOffset.secondaryImageByteOrder = 1 if inps.secondaryByteOrder == 'b' else 0
 
     print("image length:",length)
     print("image width:",width)

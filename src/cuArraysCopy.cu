@@ -17,6 +17,14 @@
  *   used for fft oversampling
  *   see also cuArraysPadding.cu for other zero-padding utilities
  * cuArraysR2C cuArraysC2R cuArraysAbs to convert between different data types
+ * cuArraysNanToZero to replace non-finite (NaN/Inf) pixels in a raw loaded image chunk with 0,
+ *   guarding against corrupted input SLCs (e.g. NaN pixels from GAMMA-focused data) poisoning
+ *   an entire correlation window -- see cuAmpcorProcessor{TwoPass,OnePass}::load{Reference,Secondary}Chunk
+ * cuArraysByteSwap to reverse the byte order of a raw loaded image chunk in place, for source
+ *   SLCs stored big-endian (e.g. GAMMA's native FCOMPLEX/SCOMPLEX format) -- SlcImage::loadToDevice
+ *   is a raw byte copy with no endian awareness, so this must run right after it, and before
+ *   cuArraysNanToZero (a value that is garbage only because it hasn't been swapped yet must not
+ *   be zeroed out)
  */
 
 
@@ -26,6 +34,109 @@
 #include "cudaError.h"
 #include "float2.h"
 #include "data_types.h"
+
+// kernel for cuArraysNanToZero (complex image chunk)
+__global__ void cuArraysNanToZero_kernel(image_complex_type *image, const int size)
+{
+    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    if(idx >= size) return;
+    image_complex_type v = image[idx];
+    // also reject a pixel whose magnitude-squared would itself overflow float32:
+    // cuArraysAbs/normalization compute x*x+y*y downstream, so a value that is
+    // individually finite but ~1e19+ in magnitude still turns into Inf there,
+    // which is exactly as poisonous to the whole window as a literal NaN/Inf pixel
+    real_type mag2 = v.x*v.x + v.y*v.y;
+    if(!isfinite(v.x) || !isfinite(v.y) || !isfinite(mag2))
+        image[idx] = make_float2(0.0f, 0.0f);
+}
+
+// kernel for cuArraysNanToZero (real image chunk)
+__global__ void cuArraysNanToZero_kernel(image_real_type *image, const int size)
+{
+    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    if(idx >= size) return;
+    image_real_type v = image[idx];
+    if(!isfinite(v) || !isfinite(v*v))
+        image[idx] = 0.0f;
+}
+
+/**
+ * Replace non-finite (NaN/Inf) pixels, and pixels whose magnitude would overflow
+ * float32 once squared, in a just-loaded raw image chunk with 0
+ * @note a single bad pixel anywhere in a window otherwise poisons that window's whole
+ *   correlation sum (NaN propagates through the FFT/normalization), so this treats a
+ *   corrupted source pixel the same way an out-of-image-range pixel is already treated:
+ *   as zero amplitude/no data
+ * @param image the raw chunk buffer, densely packed row-major (as loaded by SlcImage::loadToDevice)
+ * @param validSize the number of pixels actually loaded into image (chunk height * width;
+ *   may be smaller than image's allocated capacity for an edge chunk)
+ */
+void cuArraysNanToZero(cuArrays<image_complex_type> *image, const int validSize, cudaStream_t stream)
+{
+    const int nthreads = NTHREADS;
+    int gridSize = IDIVUP(validSize, nthreads);
+    cuArraysNanToZero_kernel<<<gridSize, nthreads, 0, stream>>>(image->devData, validSize);
+    getLastCudaError("cuArraysNanToZero_kernel complex");
+}
+
+void cuArraysNanToZero(cuArrays<image_real_type> *image, const int validSize, cudaStream_t stream)
+{
+    const int nthreads = NTHREADS;
+    int gridSize = IDIVUP(validSize, nthreads);
+    cuArraysNanToZero_kernel<<<gridSize, nthreads, 0, stream>>>(image->devData, validSize);
+    getLastCudaError("cuArraysNanToZero_kernel real");
+}
+
+// reverse the 4 bytes of a 32-bit float in place
+__device__ __forceinline__ float cuByteSwapFloat(float f)
+{
+    unsigned int i = __float_as_uint(f);
+    i = ((i & 0x000000ffu) << 24) | ((i & 0x0000ff00u) << 8)
+      | ((i & 0x00ff0000u) >> 8)  | ((i & 0xff000000u) >> 24);
+    return __uint_as_float(i);
+}
+
+// kernel for cuArraysByteSwap (complex image chunk)
+__global__ void cuArraysByteSwap_kernel(image_complex_type *image, const int size)
+{
+    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    if(idx >= size) return;
+    image_complex_type v = image[idx];
+    image[idx] = make_float2(cuByteSwapFloat(v.x), cuByteSwapFloat(v.y));
+}
+
+// kernel for cuArraysByteSwap (real image chunk)
+__global__ void cuArraysByteSwap_kernel(image_real_type *image, const int size)
+{
+    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    if(idx >= size) return;
+    image[idx] = cuByteSwapFloat(image[idx]);
+}
+
+/**
+ * Reverse the byte order of a just-loaded raw image chunk in place
+ * @note SlcImage::loadToDevice is a raw byte copy with no endian awareness; a source SLC
+ *   stored big-endian (e.g. GAMMA's native format) must be swapped here, before anything
+ *   else touches it -- including cuArraysNanToZero, since a big-endian bit pattern that looks
+ *   like garbage/NaN before swapping may be a perfectly valid sample once correctly ordered
+ * @param image the raw chunk buffer, densely packed row-major (as loaded by SlcImage::loadToDevice)
+ * @param validSize the number of pixels actually loaded into image (chunk height * width)
+ */
+void cuArraysByteSwap(cuArrays<image_complex_type> *image, const int validSize, cudaStream_t stream)
+{
+    const int nthreads = NTHREADS;
+    int gridSize = IDIVUP(validSize, nthreads);
+    cuArraysByteSwap_kernel<<<gridSize, nthreads, 0, stream>>>(image->devData, validSize);
+    getLastCudaError("cuArraysByteSwap_kernel complex");
+}
+
+void cuArraysByteSwap(cuArrays<image_real_type> *image, const int validSize, cudaStream_t stream)
+{
+    const int nthreads = NTHREADS;
+    int gridSize = IDIVUP(validSize, nthreads);
+    cuArraysByteSwap_kernel<<<gridSize, nthreads, 0, stream>>>(image->devData, validSize);
+    getLastCudaError("cuArraysByteSwap_kernel real");
+}
 
 // cuda kernel for cuArraysCopyToBatch
 __global__ void cuArraysCopyToBatch_kernel(const image_complex_type *imageIn, const int inNX, const int inNY,
