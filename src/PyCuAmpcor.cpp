@@ -48,6 +48,11 @@ PYBIND11_MODULE(pycuampcor, m)
         .DEF_PARAM(int, numberWindowDown)
         .DEF_PARAM(int, numberWindowAcross)
 
+        // derived by setupParams(), read-only
+        .def_property_readonly("numberWindows", [](const cls& self) {
+            return self.param->numberWindows;
+        })
+
         .DEF_PARAM_RENAME(int, windowSizeHeight, windowSizeHeightRaw)
         .DEF_PARAM_RENAME(int, windowSizeWidth,  windowSizeWidthRaw)
 
@@ -118,7 +123,7 @@ PYBIND11_MODULE(pycuampcor, m)
         },
         "Returns the number of SMs (streaming multiprocessors) on the given device.")
 
-        .def("device_list", &::gpuDeviceList,
+        .def_static("device_list", &::gpuDeviceList,
         "List all available cuda devices")
 
     ;
