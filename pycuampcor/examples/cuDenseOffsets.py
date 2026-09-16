@@ -566,7 +566,8 @@ def main(iargs=None):
 
     print(inps.outprefix)
     outDir = os.path.dirname(inps.outprefix)
-    os.makedirs(outDir, exist_ok=True)
+    if outDir:
+        os.makedirs(outDir, exist_ok=True)
 
     # estimate offset
     geomDict = estimateOffsetField(inps.reference, inps.secondary, inps)[1]
