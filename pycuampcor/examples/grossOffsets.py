@@ -5,7 +5,7 @@ import os
 import argparse
 import isce
 import isceobj
-import gdal
+from osgeo import gdal
 import pyproj
 import numpy as np
 import matplotlib.pyplot as plt

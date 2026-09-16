@@ -10,6 +10,14 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.6"
 
+[project.scripts]
+cuDenseOffsets = "pycuampcor.examples.cuDenseOffsets:main"
+plotOffsets = "pycuampcor.examples.plotOffsets:main"
+grossOffsets = "pycuampcor.examples.grossOffsets:main"
+GeoTiffSample = "pycuampcor.examples.GeoTiffSample:main"
+glacierSample = "pycuampcor.examples.glacierSample:main"
+varyGrossOffsetSample = "pycuampcor.examples.varyGrossOffsetSample:main"
+
 [tool.scikit-build]
 # optional: set CMake options
 cmake.version = ">=3.15"

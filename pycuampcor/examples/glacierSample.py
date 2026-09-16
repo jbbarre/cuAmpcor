@@ -42,7 +42,7 @@ def main():
     objOffset.numberWindowAcrossInChunk = 10
     objOffset.corrSurfaceOverSamplingFactor = 8
     objOffset.corrSurfaceZoomInWindow = 16
-    objOffset.corrSufaceOverSamplingMethod = 1
+    objOffset.corrSurfaceOverSamplingMethod = 1
     objOffset.useMmap = 1
     objOffset.mmapSize = 8
 

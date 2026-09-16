@@ -78,7 +78,7 @@ Or simply use
 
 ## 3. User Guide
 
-The main procedures of PyCuAmpcor are implemented with CUDA/C++. A Python interface to configure and run PyCuAmpcor is offered. Sample python scripts are provided in *contrib/PyCuAmpcor/examples* directory.
+The main procedures of PyCuAmpcor are implemented with CUDA/C++. A Python interface to configure and run PyCuAmpcor is offered. Sample python scripts are provided in the *pycuampcor/examples* directory (*contrib/PyCuAmpcor/pycuampcor/examples* when embedded in ISCE2). `pip install .` also registers each of these scripts as a command on your `PATH` (e.g. *cuDenseOffsets*, *plotOffsets*), so they can be run directly without the `.py` extension or a path to the script.
 
 ### 3.1 cuDenseOffsets.py
 

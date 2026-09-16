@@ -20,8 +20,8 @@ def main():
     objOffset.referenceImageHeight = 128
     objOffset.referenceImageWidth = 128
     objOffset.secondaryImageName = "secondary.slc.vrt"
-    objOffset.referenceImageHeight = 128
-    objOffset.referenceImageWidth = 128
+    objOffset.secondaryImageHeight = 128
+    objOffset.secondaryImageWidth = 128
     objOffset.skipSampleDown = 2
     objOffset.skipSampleAcross = 2
     objOffset.windowSizeHeight = 16

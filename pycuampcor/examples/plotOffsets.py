@@ -111,8 +111,7 @@ def plot_velocity(azimuth_data, range_data, grid=20, vmin_azimuth=None, vmax_azi
     plt.tight_layout()
     plt.show()    
 
-# Main program
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Plot Azimuth Offset and Range Offset from a VRT file - cmap, 3d surface, or velocity map.")
     parser.add_argument("vrt_file", type=str, help="Path to the offset VRT file")
     parser.add_argument("--plot_3d", action="store_true", help="3D surface plot for both offsets")
@@ -187,3 +186,6 @@ if __name__ == "__main__":
             vmin_azimuth, vmax_azimuth, vmin_range, vmax_range,
             args.cmap
         )
+
+if __name__ == "__main__":
+    main()

@@ -44,7 +44,7 @@ def main():
     objOffset.numberWindowAcrossInChunk = 10
     objOffset.corrSurfaceOverSamplingFactor = 8 # oversampling factor for correlation surface
     objOffset.corrSurfaceZoomInWindow = 16  # area in correlation surface to be oversampled
-    objOffset.corrSufaceOverSamplingMethod = 1 # fft or sinc oversampler
+    objOffset.corrSurfaceOverSamplingMethod = 1 # fft or sinc oversampler
     objOffset.useMmap = 1 # default using memory map as buffer, if having troubles, set to 0
     objOffset.mmapSize = 1 # mmap or buffer size used for transferring data from file to gpu, in GB
 
