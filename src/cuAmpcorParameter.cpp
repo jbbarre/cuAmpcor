@@ -69,6 +69,22 @@ cuAmpcorParameter::cuAmpcorParameter()
 
     mergeGrossOffset = 0; // default to separate gross offset
 
+    // allocated by allocateArrays() in setupParameters();
+    // nulled here so the destructor is safe if setupParameters() is never called
+    grossOffsetDown = nullptr;
+    grossOffsetAcross = nullptr;
+    referenceStartPixelDown = nullptr;
+    referenceStartPixelAcross = nullptr;
+    secondaryStartPixelDown = nullptr;
+    secondaryStartPixelAcross = nullptr;
+    referenceChunkStartPixelDown = nullptr;
+    referenceChunkStartPixelAcross = nullptr;
+    secondaryChunkStartPixelDown = nullptr;
+    secondaryChunkStartPixelAcross = nullptr;
+    referenceChunkHeight = nullptr;
+    referenceChunkWidth = nullptr;
+    secondaryChunkHeight = nullptr;
+    secondaryChunkWidth = nullptr;
 }
 
 /**
