@@ -10,7 +10,9 @@ import isceobj
 @click.argument('id1_range', type=int)
 @click.argument('id2', type=str)
 @click.argument('id2_range', type=int)
-def create_slc_xml(id1:str, id1_range:int, id2:str, id2_range:int):
+@click.option('--byte-order', type=click.Choice(['b', 'l']), default='b', show_default=True,
+              help='Byte order of the SLC files (b=big-endian, GAMMA-native FCOMPLEX; l=little-endian).')
+def create_slc_xml(id1:str, id1_range:int, id2:str, id2_range:int, byte_order:str):
     """Create XML and VRT files for SLC images.
 
     Args:
@@ -18,6 +20,8 @@ def create_slc_xml(id1:str, id1_range:int, id2:str, id2_range:int):
         id1_range (int): Width of the first SLC image.
         id2 (str): Filename of the second SLC image without extension.
         id2_range (int): Width of the second SLC image.
+        byte_order (str): Byte order of both SLC files ('b' or 'l'), recorded in the XML/VRT
+            so that cuDenseOffsets.py picks it up by default.
     """
 
     for fname, width in [(id1 + '.slc', id1_range), (id2 + '.slc', id2_range)]:
@@ -29,6 +33,7 @@ def create_slc_xml(id1:str, id1_range:int, id2:str, id2_range:int):
         img.setFilename(fname)
         img.setWidth(width)
         img.setLength(length)
+        img.setByteOrder(byte_order)
         img.setAccessMode('READ')
         img.renderHdr()   # writes fname.xml
         img.renderVRT()   # writes fname.vrt

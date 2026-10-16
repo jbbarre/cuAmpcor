@@ -21,6 +21,7 @@ overflows its Python format silently shifts every later column on that line.
 import argparse
 import os
 import re
+import sys
 import numpy as np
 
 
@@ -273,11 +274,16 @@ def convert(inps):
     if inps.keep_nan:
         print('Note: legacy ampcor.F also silently excludes edge/no-data windows; NaN dropping '
               '(disabled here via --keep-nan) is the closest cuAmpcor equivalent to that check.')
+    return nWritten
 
 
 def main(iargs=None):
     inps = cmdLineParse(iargs)
-    convert(inps)
+    if convert(inps) == 0:
+        # an empty table almost always means the cuAmpcor run itself failed (e.g. wrong
+        # input byte order -> all-NaN SNR); fail loudly so batch jobs don't carry on silently
+        sys.exit(f'ERROR: no valid windows written to {inps.output}; check the cuAmpcor outputs '
+                 '(all-NaN SNR or cov=99 everywhere usually means the input SLCs were misread).')
 
 
 if __name__ == '__main__':
