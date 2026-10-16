@@ -226,9 +226,8 @@ def convert(inps):
     covXY = cov[:, :, 2].astype(np.float64)
 
     # Window CENTER pixel, matching legacy's i_centerxi/i_centeryi = start + (size-1)/2
-    azimuthLoc = inps.start_down + inps.win_height // 2 + np.arange(length) * inps.skip_down
-    rangeLoc = inps.start_across + inps.win_width // 2 + np.arange(width) * inps.skip_across
-
+    azimuthLoc = inps.start_down + (inps.win_height - 1) // 2 + np.arange(length) * inps.skip_down
+    rangeLoc   = inps.start_across + (inps.win_width - 1) // 2 + np.arange(width) * inps.skip_across
     nWritten = 0
     nDroppedSnr = 0
     nDroppedCov = 0
