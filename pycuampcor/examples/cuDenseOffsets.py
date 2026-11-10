@@ -20,7 +20,7 @@ try:
     # try standalone at first
     from pycuampcor import PyCuAmpcor
     print("using standalone pycuampcor")
-except ImportdError:
+except ImportError:
     # if installed with ISCE2
     from contrib.pycuampcor import PyCuAmpcor
     print("using pycuampcor from isce")
