@@ -7,6 +7,7 @@ import os
 import sys
 import time
 import argparse
+import json
 import numpy as np
 from osgeo import gdal
 
@@ -506,7 +507,52 @@ def estimateOffsetField(reference, secondary, inps=None):
     peakValueImg.setAccessMode('read')
     peakValueImg.renderHdr()
 
+    # record the geometry this run actually used, for toLegacyAmpcor and other readers
+    writeRunGeometry(objOffset, fbase, offsetImageName, grossOffsetImageName,
+                     snrImageName, covImageName, peakValueImageName)
+
     return objOffset, geomDict
+
+
+def writeRunGeometry(objOffset, fbase, offsetImageName, grossOffsetImageName,
+                     snrImageName, covImageName, peakValueImageName):
+    """Write <fbase>_geometry.json describing the window grid of the finished run.
+
+    The start pixels are the values the run used (after the margin/search-range default
+    and the --use-center adjustment), which can differ from what was typed in. It also
+    records mergeGrossOffset: when it is set, the offset .bip already includes the gross
+    offset, and the _gross.bip written next to it must not be added again.
+    """
+    geometry = {
+        'format': 'cuampcor-run-geometry',
+        'version': 1,
+        'pixel_index_base': 0,
+        # top-left pixel of the first reference window (0-based)
+        'start_pixel_down': int(objOffset.referenceStartPixelDownStatic),
+        'start_pixel_across': int(objOffset.referenceStartPixelAcrossStatic),
+        'skip_down': int(objOffset.skipSampleDown),
+        'skip_across': int(objOffset.skipSampleAcross),
+        'window_height': int(objOffset.windowSizeHeight),
+        'window_width': int(objOffset.windowSizeWidth),
+        'number_window_down': int(objOffset.numberWindowDown),
+        'number_window_across': int(objOffset.numberWindowAcross),
+        'half_search_range_down': int(objOffset.halfSearchRangeDown),
+        'half_search_range_across': int(objOffset.halfSearchRangeAcross),
+        'merge_gross_offset': bool(objOffset.mergeGrossOffset),
+        'files': {
+            'offset': os.path.basename(offsetImageName),
+            'gross_offset': os.path.basename(grossOffsetImageName),
+            'snr': os.path.basename(snrImageName),
+            'cov': os.path.basename(covImageName),
+            'peak_value': os.path.basename(peakValueImageName),
+        },
+    }
+    path = fbase + '_geometry.json'
+    with open(path + '.tmp', 'w') as f:
+        json.dump(geometry, f, indent=2)
+        f.write('\n')
+    os.replace(path + '.tmp', path)
+    print('run geometry: ', path)
 
 
 def prepareGeometry(full_dir, out_dir, x_start, y_start, x_step, y_step, x_win_num, y_win_num,
