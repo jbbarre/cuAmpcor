@@ -108,6 +108,29 @@ def fortranIntField(value, width):
     return text.rjust(width)
 
 
+# Legacy ampcor.F format 151: 1x,i7,1x,f9.3,1x,i7,1x,f11.3,1x,f10.5,1x,f10.6,1x,f10.6,1x,f10.6
+LINE_FORMAT = ' %7d %9.3f %7d %11.3f %10.5f %10.6f %10.6f %10.6f\n'
+LINE_LENGTH = 83  # characters per line, newline included, when every value fits its field
+WRITE_BLOCK = 10000  # windows formatted per write call (bounds memory; larger is not faster)
+
+
+def formatLineFortran(vals):
+    """Slow path for a line where at least one value overflows its field: format every
+    column with the Fortran-style helpers so the overflowing ones become asterisks."""
+    rangeLoc, acrossOff, azimuthLoc, downOff, snr, covXX, covYY, covXY = vals
+    fields = [
+        fortranIntField(int(rangeLoc), 7),
+        fortranField(acrossOff, 9, 3),
+        fortranIntField(int(azimuthLoc), 7),
+        fortranField(downOff, 11, 3),
+        fortranField(snr, 10, 5),
+        fortranField(covXX, 10, 6),
+        fortranField(covYY, 10, 6),
+        fortranField(covXY, 10, 6),
+    ]
+    return ' ' + ' '.join(fields) + '\n'
+
+
 def createParser():
     parser = argparse.ArgumentParser(
         description='Convert cuAmpcor (GPU) output rasters into the legacy ampcor.F (CPU) text format.',
@@ -229,40 +252,49 @@ def convert(inps):
     # Window CENTER pixel, matching legacy's i_centerxi/i_centeryi = start + (size-1)/2
     azimuthLoc = inps.start_down + (inps.win_height - 1) // 2 + np.arange(length) * inps.skip_down
     rangeLoc   = inps.start_across + (inps.win_width - 1) // 2 + np.arange(width) * inps.skip_across
-    nWritten = 0
-    nDroppedSnr = 0
-    nDroppedCov = 0
-    nDroppedNan = 0
+    # Decide which windows are written, for the whole grid at once. The order of the
+    # checks (NaN/Inf first, then SNR, then covariance) matches the per-window loop this
+    # replaces, so the dropped-window counts reported below are unchanged.
+    remaining = np.ones((length, width), dtype=bool)
+    nDroppedNan = nDroppedSnr = nDroppedCov = 0
+    if not inps.keep_nan:
+        finite = (np.isfinite(downOffset) & np.isfinite(acrossOffset) & np.isfinite(snr)
+                  & np.isfinite(covXX) & np.isfinite(covYY) & np.isfinite(covXY))
+        nDroppedNan = int(np.count_nonzero(~finite))
+        remaining &= finite
+    if inps.min_snr is not None:
+        drop = remaining & (snr < inps.min_snr)
+        nDroppedSnr = int(np.count_nonzero(drop))
+        remaining &= ~drop
+    if inps.max_cov is not None:
+        drop = remaining & ((covXX > inps.max_cov) | (covYY > inps.max_cov))
+        nDroppedCov = int(np.count_nonzero(drop))
+        remaining &= ~drop
+
+    # Row-major (azimuth line, then range sample) order, same as the legacy output.
+    rows, cols = np.nonzero(remaining)
+    nWritten = int(rows.size)
+
     with open(inps.output, 'w') as f:
         if inps.header:
             f.write('# range_loc range_offset azimuth_loc azimuth_offset SNR cov_xx cov_yy cov_xy\n')
-        for i in range(length):
-            for j in range(width):
-                if not inps.keep_nan:
-                    rowVals = (downOffset[i, j], acrossOffset[i, j], snr[i, j],
-                               covXX[i, j], covYY[i, j], covXY[i, j])
-                    if any(np.isnan(v) or np.isinf(v) for v in rowVals):
-                        nDroppedNan += 1
-                        continue
-                if inps.min_snr is not None and snr[i, j] < inps.min_snr:
-                    nDroppedSnr += 1
-                    continue
-                if inps.max_cov is not None and (covXX[i, j] > inps.max_cov or covYY[i, j] > inps.max_cov):
-                    nDroppedCov += 1
-                    continue
-
-                fields = [
-                    fortranIntField(int(rangeLoc[j]), 7),
-                    fortranField(acrossOffset[i, j], 9, 3),
-                    fortranIntField(int(azimuthLoc[i]), 7),
-                    fortranField(downOffset[i, j], 11, 3),
-                    fortranField(snr[i, j], 10, 5),
-                    fortranField(covXX[i, j], 10, 6),
-                    fortranField(covYY[i, j], 10, 6),
-                    fortranField(covXY[i, j], 10, 6),
-                ]
-                f.write(' ' + ' '.join(fields) + '\n')
-                nWritten += 1
+        # Write in blocks so the text for a very large grid never sits in memory at once.
+        for b in range(0, nWritten, WRITE_BLOCK):
+            r = rows[b:b + WRITE_BLOCK]
+            c = cols[b:b + WRITE_BLOCK]
+            block = zip(rangeLoc[c].tolist(), acrossOffset[r, c].tolist(),
+                        azimuthLoc[r].tolist(), downOffset[r, c].tolist(), snr[r, c].tolist(),
+                        covXX[r, c].tolist(), covYY[r, c].tolist(), covXY[r, c].tolist())
+            lines = []
+            for vals in block:
+                line = LINE_FORMAT % vals
+                # A value too wide for its column makes the line longer than LINE_LENGTH.
+                # Only those rare lines go through the slower Fortran-style formatter,
+                # which writes asterisks instead of shifting the later columns.
+                if len(line) != LINE_LENGTH:
+                    line = formatLineFortran(vals)
+                lines.append(line)
+            f.write(''.join(lines))
 
     print(f'Wrote {nWritten} windows ({length}x{width} grid) to {inps.output}')
     if nDroppedNan:
