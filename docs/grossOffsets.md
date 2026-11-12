@@ -6,9 +6,29 @@
 varying gross offset lets you use a much smaller search range on fast-moving ice.
 
 Installed as a console command by `pip install .` (`[project.scripts]`), or run as
-`python -m pycuampcor.examples.grossOffsets`. Runtime dependencies: `numpy`, `pyproj`
+`python -m pycuampcor.grossOffsets`. Runtime dependencies: `numpy`, `pyproj`
 (GDAL only for the optional raster geometry input / `--save-rasters`, matplotlib only for `--plot`;
 no ISCE).
+
+## Quick start
+
+Needs `numpy` and `pyproj`; the one-time model preparation also needs `netCDF4`. Inputs: the MEaSUREs
+v2 450 m NetCDF and the GAMMA `.par` of the reference and secondary images.
+
+```bash
+# 1. once: convert the NetCDF to a memory-mappable .npy (+ .json)
+grossOffsets --prepare-model antarctica_ice_velocity_450m_v2.nc antarctica_vxvy_450m.npy
+
+# 2. per pair: use the SAME window-grid options as the cuDenseOffsets command
+grossOffsets --model antarctica_vxvy_450m.npy --ref-par ref.slc.par --sec-par sec.slc.par \
+    --ww 64 --wh 64 --sw 20 --sh 20 --kw 64 --kh 64 --outdir out --outname grossOffsets.bin
+
+# 3. pass the result to cuDenseOffsets (and reduce --sw/--sh accordingly)
+cuDenseOffsets ... --gross 1 --gross-file out/grossOffsets.bin
+```
+
+Check that the printed `the number of windows: N by M` matches what `cuDenseOffsets` reports.
+Details of every step follow; `grossOffsets -h` lists all options.
 
 ---
 
@@ -129,7 +149,7 @@ print(g.min(0), g.max(0))
 ### 5.4 From Python
 
 ```python
-from pycuampcor.examples.grossOffsets import main
+from pycuampcor.grossOffsets import main
 status = main(['--model', 'antarctica_vxvy_450m.npy', '--ref-par', 'a.par', '--sec-par', 'b.par'])
 ```
 

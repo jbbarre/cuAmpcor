@@ -11,12 +11,12 @@ readme = "README.md"
 requires-python = ">=3.6"
 
 [project.scripts]
-cuDenseOffsets = "pycuampcor.examples.cuDenseOffsets:main"
-plotOffsets = "pycuampcor.examples.plotOffsets:main"
-grossOffsets = "pycuampcor.examples.grossOffsets:main"
-GeoTiffSample = "pycuampcor.examples.GeoTiffSample:main"
-glacierSample = "pycuampcor.examples.glacierSample:main"
-varyGrossOffsetSample = "pycuampcor.examples.varyGrossOffsetSample:main"
+cuDenseOffsets = "pycuampcor.cuDenseOffsets:main"
+plotOffsets = "pycuampcor.plotOffsets:main"
+grossOffsets = "pycuampcor.grossOffsets:main"
+GeoTiffSample = "pycuampcor.GeoTiffSample:main"
+glacierSample = "pycuampcor.glacierSample:main"
+varyGrossOffsetSample = "pycuampcor.varyGrossOffsetSample:main"
 toLegacyAmpcor = "pycuampcor.scripts.toLegacyAmpcor:main"
 
 [tool.scikit-build]

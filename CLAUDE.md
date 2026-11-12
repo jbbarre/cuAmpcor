@@ -35,8 +35,8 @@ a reference for the current source layout or as a build path; use CMake instead.
 
 There is no automated test suite in this repository. Verifying changes to the CUDA/C++ core means building the
 extension and running it against sample SLC data (e.g. via the `cuDenseOffsets` console command installed by
-`pip install .`, or `python -m pycuampcor.examples.cuDenseOffsets`) or one of the other scripts under
-`pycuampcor/examples/`.
+`pip install .`, or `python -m pycuampcor.cuDenseOffsets`) or one of the other driver scripts directly under
+`pycuampcor/` (or `pycuampcor/scripts/`).
 
 CUDA toolkit (with cuFFT), pybind11, and GDAL (>=3.1.0 recommended for mmap-accelerated I/O) are required
 dependencies.
@@ -44,12 +44,13 @@ dependencies.
 ## Architecture
 
 **Two-language split**: `src/` is the CUDA/C++ computational core; `pycuampcor/__init__.py` just re-exports the
-compiled `pycuampcor` extension (`from .pycuampcor import *`); `pycuampcor/examples/` holds user-facing Python
+compiled `pycuampcor` extension (`from .pycuampcor import *`); the driver scripts live directly in `pycuampcor/` (the former `examples/` layer was removed) and
+`pycuampcor/scripts/` holds utilities (`toLegacyAmpcor.py`, `create_slc_xml.py`). They are user-facing Python
 driver scripts, most importantly `cuDenseOffsets.py` (the general-purpose CLI entry point used in InSAR stacks)
 and `plotOffsets.py` (offset field visualization). Each script's `main()` is also registered as a console-script
 command in `[project.scripts]` in `pyproject.toml`, so after `pip install .` they're runnable directly as e.g.
-`cuDenseOffsets ...` (no `.py`, no path) instead of `python -m pycuampcor.examples.cuDenseOffsets ...`. Add new
-example scripts under `pycuampcor/examples/` (not a top-level `examples/`) with a callable `main()` if they should
+`cuDenseOffsets ...` (no `.py`, no path) instead of `python -m pycuampcor.cuDenseOffsets ...`. Add new
+scripts under `pycuampcor/` (drivers) or `pycuampcor/scripts/` (utilities) with a callable `main()` if they should
 be pip-installable the same way, and register them in `[project.scripts]`.
 
 **Python binding** (`src/PyCuAmpcor.cpp`): a single pybind11 module wraps `cuAmpcorController`. Most parameters
