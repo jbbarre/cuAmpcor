@@ -156,6 +156,8 @@ PyCuAmpcor supports two types of gross offset fields,
 * static (--gross=0), i.e., a constant shift between reference and secondary images. The static gross offsets can be passed by *--rr $rgshift --aa $azshift*. Note that the margin as well as the starting pixel may be adjusted.
 * dynamic (--gross=1), i.e., shifts between reference windows and secondary windows are varying in different locations. This is helpful to reduce the search range if you have a prior knowledge of the estimated offset fields, e.g., the velocity model of glaciers. You may prepare a BIP input file of the varying gross offsets (same format as the output offset fields), and use the option *--gross-file $grossOffsetFilename*. If you need the coordinates of reference windows, you may run *cuDenseOffsets.py* at first to find out the location of the starting pixel and the total number of windows. The coordinate for the starting pixel of the (iDown, iAcross) window will be (startPixelDown+iDown\*skipDown, startPixelAcross+iAcross\*skipAcross).
 
+For velocity-model gross offsets (Antarctica, MEaSUREs), see [docs/grossOffsets.md](docs/grossOffsets.md) for the *grossOffsets* command.
+
 ### 3.2 Customized Python Scripts
 
 If you need more control of the computation, or incorporate the PyCuAmpcor procedure in your InSAR processing stacks, you may follow the *cuDenseOffsets.py* example to create your own Python script. The general steps are
