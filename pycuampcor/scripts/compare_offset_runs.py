@@ -13,6 +13,7 @@ import numpy as np
 
 N, M = 1299, 1907
 SNR_MIN = 20.0
+BIG_SHIFT = 5.0        # section 6: windows where the model asks for |gross range| >= this (px)
 RUNS = {                                   # half = (azimuth, range) half search
     'static_wide': dict(prefix='manual_offset/003193-003368.offmap_1', half=(8, 32)),
     'narrow':      dict(prefix='half_sw',                              half=(4, 8)),
@@ -49,7 +50,7 @@ def main():
         off = rd(r['prefix'] + '.bip', N, M, 2)
         gro = rd(r['prefix'] + '_gross.bip', N, M, 2)
         snr = rd(r['prefix'] + '_snr.bip', N, M)
-        D[name] = dict(off=off, tot=off + gro, snr=snr, half=r['half'])
+        D[name] = dict(off=off, gro=gro, tot=off + gro, snr=snr, half=r['half'])
         print('%-12s gross median on ice (az, rg): %s' %
               (name, np.round(np.median(gro[ice], axis=0), 2)))
 
@@ -103,6 +104,26 @@ def main():
         df = np.abs(D['narrow']['tot'][..., k][both] - D['static_wide']['tot'][..., k][both])
         print('%-8s kept windows, |diff| >1 px: %.2f%%, >3 px: %.2f%%' %
               (NAMES[k], 100 * (df > 1).mean(), 100 * (df > 3).mean()))
+
+    # 6. where the model asked for a big range shift: does the data follow?
+    print('\n== 6. windows where the model run asked for |gross range| >= %g px ==' % BIG_SHIFT)
+    m = D['model_wide']
+    bulk = np.median(m['tot'][..., RG][m['good']])
+    sel = m['good'] & (np.abs(m['gro'][..., RG]) >= BIG_SHIFT)
+    print('good windows: %d   (bulk range shift used: %.2f px)' % (sel.sum(), bulk))
+    if sel.sum() > 0:
+        gross = m['gro'][..., RG][sel]
+        meas = m['tot'][..., RG][sel] - bulk          # measured motion, same sign convention as gross
+        print('model gross range      median %+6.2f   |.| p50/p90 %s' %
+              (np.median(gross), pct(np.abs(gross), (50, 90))))
+        print('measured total - bulk  median %+6.2f   |.| p50/p90 %s' %
+              (np.median(meas), pct(np.abs(meas), (50, 90))))
+        print('correlation gross vs measured: %.2f' % np.corrcoef(gross, meas)[0, 1])
+        print('measured below half of gross: %.1f%%   same sign as gross: %.1f%%' %
+              (100 * (np.abs(meas) < 0.5 * np.abs(gross)).mean(),
+               100 * (np.sign(meas) == np.sign(gross)).mean()))
+        print('(near the gross values: model right in size; much smaller: model overestimates or '
+              'velocity-to-pixel conversion is off; opposite sign: sign problem)')
 
 
 if __name__ == '__main__':
