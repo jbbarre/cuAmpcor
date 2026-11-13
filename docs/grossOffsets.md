@@ -93,7 +93,7 @@ same format.
 | `--outdir`, `--outname` | `.`, `grossOffsets.bin` | created if missing |
 | `--decimate-m`, `--no-decimate` | 400 | coarse-grid spacing, see above |
 | `--overwrite` | off | recompute even if `<outname>` and its `.json` signature are up to date |
-| `--save-rasters`, `--plot` | off | ENVI float/int rasters (GDAL), PNG preview (matplotlib) |
+| `--save-rasters`, `--plot` | off | COG (GeoTIFF) float/int rasters (GDAL >= 3.1), PNG preview (matplotlib) |
 | `-q` | | only warnings and errors |
 
 ## 4. Outputs
@@ -114,6 +114,8 @@ file, empty grid, no window on valid data), so `set -e` / `trap ... ERR` in job 
 
 ### 5.1 Slurm job (one job per pair), chained to cuDenseOffsets
 
+Define the window grid **once** and pass the same string to both commands:
+
 ```bash
 GRID="--ww 192 --wh 48 --sw 32 --sh 8 --kw 34 --kh 10 \
       --startpixeldw 15 --startpixelac 24 --endpixeldw 13052 --endpixelac 64774"
@@ -122,12 +124,73 @@ grossOffsets --model /path/antarctica_vxvy_450m.npy \
     --ref-par 003543.par --sec-par 003718.par $GRID \
     --outname 003543-003718.gross.bin
 
-cuDenseOffsets -r 003543.slc -s 003718.slc --op 003543-003718.offmap_1 $GRID_AS_CUDENSE \
+cuDenseOffsets -r 003543.slc -s 003718.slc --op 003543-003718.offmap_1 $GRID \
     --gross 1 --gross-file 003543-003718.gross.bin ...
 ```
 
-(`$GRID_AS_CUDENSE` = the same `--ww/--wh/--sw/--sh/--kw/--kh/--startpixel*/--endpixel*` options.
-Drop `--rr/--aa`: with a varying gross file the static values are not used.)
+Drop `--rr/--aa`: with a varying gross file the static values are not used.
+
+### 5.1b Worked example: replacing a static shift by the velocity model
+
+A pair (003193 / 003368, image 13118 lines x 65298 samples) was first run with a static shift:
+
+```bash
+cuDenseOffsets -r 003193.slc -s 003368.slc --op 003193-003368.offmap_1 \
+    --ww 192 --wh 48 --sw 32 --sh 8 --kw 34 --kh 10 \
+    --startpixeldw 18 --startpixelac 59 --endpixeldw 13058 --endpixelac 65089 \
+    --rr -21 --aa -4 --alg 0 --raw-osf 2 --oo 32 --corr-srch-size 4 --drmp 0 \
+    --gpuid 0 --nstreams 2 --nwac 64 --nwdc 4 --redo
+```
+
+**Pitfall: the grid options of `grossOffsets` must include the start/end pixels.** Running
+
+```bash
+grossOffsets --model antarctica_vxvy_450m.npy --ref-par 003193.par --sec-par 003368.par \
+    --ww 192 --wh 48 --sw 32 --sh 8 --kw 34 --kh 10 --outdir . --outname grossOffsets.bin
+```
+
+prints
+
+```
+the number of windows: 1305 by 1913
+the center pixel of the first window is : (32, 128)
+```
+
+because the start/end pixels default to `margin + half search` and `size - margin - half search`
+(start 8 / 32, end 13110 / 65266). The `cuDenseOffsets` command above uses start (18, 59) and
+end (13058, 65089), i.e. **1299 x 1907 windows with the first centre at (42, 155)**. The two
+grids differ in size and position, so the file would not match the windows. Compare these two
+lines between the programs before launching the GPU job.
+
+Corrected pair, sharing one `GRID`:
+
+```bash
+GRID="--ww 192 --wh 48 --sw 32 --sh 8 --kw 34 --kh 10 \
+      --startpixeldw 18 --startpixelac 59 --endpixeldw 13058 --endpixelac 65089"
+
+grossOffsets --model antarctica_vxvy_450m.npy --ref-par 003193.par --sec-par 003368.par \
+    $GRID --outdir . --outname grossOffsets.bin
+# expect: the number of windows: 1299 by 1907 / first centre (42, 155)
+
+cuDenseOffsets -r 003193.slc -s 003368.slc --op 003193-003368.offmap_1 \
+    $GRID --gross 1 --gross-file grossOffsets.bin \
+    --alg 0 --raw-osf 2 --oo 32 --corr-srch-size 4 --drmp 0 \
+    --gpuid 0 --nstreams 2 --nwac 64 --nwdc 4 --redo
+```
+
+(`--rr/--aa` removed; `--mg 1` would add them on top of the file, which is not wanted here.)
+
+Reading the other lines of the `grossOffsets` output:
+
+* `interval 12.0000 days, pixel size 2.3296 (range) x 14.0537 (azimuth) m`: check against the pair.
+* `evaluating 653 x 639 of ... windows (steps 2, 3)`: coarse-grid evaluation, interpolated to all windows.
+* `Warning: ... (69.3 %) have no velocity data`: those windows get offset 0. A share this large
+  means most of the scene is ice-free, ocean, or outside the model (or has no data); check
+  `--plot` and consider keeping a static `--rr/--aa` fallback for the scene part without data
+  (not supported by the file alone: such windows rely on `--sw/--sh` alone).
+* `gross azimuth offset [-6, 0] pixels, range [-5, 18] pixels`: sanity-check against the static
+  shift you used before (`--aa -4 --rr -21`) on the valid windows; a clear sign or magnitude
+  disagreement should be investigated before the run.
 
 ### 5.2 ISCE rasters instead of `.par`
 

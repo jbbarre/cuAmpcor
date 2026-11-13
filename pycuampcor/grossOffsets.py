@@ -121,7 +121,7 @@ def createParser():
                    help='evaluate every window exactly (slower)')
     g.add_argument('--overwrite', action='store_true', help='recompute even if an up-to-date output exists')
     g.add_argument('--save-rasters', action='store_true',
-                   help='also write float and int ENVI rasters (needs GDAL)')
+                   help='also write float and int Cloud Optimized GeoTIFF rasters (needs GDAL >= 3.1)')
     g.add_argument('--plot', action='store_true', help='also write a PNG preview (needs matplotlib)')
     g.add_argument('-q', '--quiet', action='store_true')
     return p
@@ -521,13 +521,22 @@ def _atomic_write_bin(path, arr):
 
 
 def save_rasters(outdir, stem, az_f, rg_f, az_i, rg_i):
+    """Write the gross-offset grids as Cloud Optimized GeoTIFFs (GDAL COG driver, GDAL >= 3.1)."""
     from osgeo import gdal
-    drv = gdal.GetDriverByName('ENVI')
+    mem = gdal.GetDriverByName('MEM')
+    cog = gdal.GetDriverByName('COG')
+    if cog is None:
+        raise RuntimeError('GDAL COG driver not available (needs GDAL >= 3.1)')
     for name, arr, typ in (('grossAzimuth', az_f, gdal.GDT_Float32), ('grossRange', rg_f, gdal.GDT_Float32),
                            ('grossAzimuth_int', az_i, gdal.GDT_Int32), ('grossRange_int', rg_i, gdal.GDT_Int32)):
-        ds = drv.Create(os.path.join(outdir, '{}_{}.off'.format(stem, name)), arr.shape[1], arr.shape[0], 1, typ)
-        ds.GetRasterBand(1).WriteArray(arr)
-        ds = None
+        src = mem.Create('', arr.shape[1], arr.shape[0], 1, typ)
+        src.GetRasterBand(1).WriteArray(arr)
+        out = os.path.join(outdir, '{}_{}.tif'.format(stem, name))
+        dst = cog.CreateCopy(out, src, options=['COMPRESS=DEFLATE', 'BLOCKSIZE=256'])
+        if dst is None:
+            raise RuntimeError('failed to write ' + out)
+        dst = None
+        src = None
 
 
 def save_plot(path, az_f, rg_f):
