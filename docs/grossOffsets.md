@@ -3,7 +3,9 @@
 `grossOffsets` converts the **MEaSUREs InSAR-Based Antarctica Ice Velocity Map (v2)**
 ([doi:10.5067/D7GK8F5J8M8R](https://doi.org/10.5067/D7GK8F5J8M8R), NSIDC-0484) into
 *per-window integer pixel offsets* in radar geometry. Feeding them to `cuDenseOffsets` as a
-varying gross offset lets you use a much smaller search range on fast-moving ice.
+varying gross offset can let you use a smaller search range on fast-moving ice. This is **not yet
+validated**: on the one pair tested (section 5.1c) the model changed nothing. Keep the search range
+wide until you have checked it on your own scene (section 6).
 
 Installed as a console command by `pip install .` (`[project.scripts]`), or run as
 `python -m pycuampcor.grossOffsets`. Runtime dependencies: `numpy`, `pyproj`
@@ -23,7 +25,7 @@ grossOffsets --prepare-model antarctica_ice_velocity_450m_v2.nc antarctica_vxvy_
 grossOffsets --model antarctica_vxvy_450m.npy --ref-par ref.slc.par --sec-par sec.slc.par \
     --ww 64 --wh 64 --sw 20 --sh 20 --kw 64 --kh 64 --outdir out --outname grossOffsets.bin
 
-# 3. pass the result to cuDenseOffsets (and reduce --sw/--sh accordingly)
+# 3. pass the result to cuDenseOffsets (reduce --sw/--sh only after checking, see section 6)
 cuDenseOffsets ... --gross 1 --gross-file out/grossOffsets.bin
 ```
 
@@ -192,6 +194,43 @@ Reading the other lines of the `grossOffsets` output:
   shift you used before (`--aa -4 --rr -21`) on the valid windows; a clear sign or magnitude
   disagreement should be investigated before the run.
 
+### 5.1c What the 003193 / 003368 test showed
+
+Three runs of this pair were compared on the same windows (ice windows only, SNR > 20; ocean
+windows give noise and were excluded with a mask from `--save-rasters`, where windows without
+velocity data are NaN in the float rasters). Script: `pycuampcor/scripts/compare_offset_runs.py`.
+
+| Run | Start shift | Search (`--sw/--sh`) |
+|---|---|---|
+| static, wide | `--rr -21 --aa -4` | 32 / 8 |
+| static, narrow | `--rr -21 --aa -5` | 8 / 4 |
+| model, wide | `--gross-file` from `grossOffsets` | 32 / 8 |
+
+Results:
+
+* **A constant bulk shift of about (-4.7 azimuth, -20.9 range) px dominates** the offsets and is the
+  same over the ice. It is not ice motion (probably the geometry or coregistration of the pair), and
+  **the velocity model does not contain it**. Starting from the model alone (almost all gross
+  offsets are 0 on ice) therefore needs the wide window.
+* Around that shift the ice windows are tight: median |deviation| 0.1 px (azimuth) and 1 px (range);
+  p99 about 0.4 and 3-4 px.
+* **On the common windows the three runs give the same total offset** (`offmap + gross`; p99
+  difference 0.02 px, more than 1 px: none). The narrow window reproduced the wide one on every
+  window it kept.
+* **The model did not help on this pair.** On windows with a non-zero gross offset, the measured
+  total offset is almost uncorrelated with it (regression slope 0.05 azimuth, 0.12 range; correlation
+  about 0.1), and subtracting the gross offset gave a larger spread than a constant shift. The model
+  asks for range shifts up to +18 px where the measured motion is a few pixels. The cause is not
+  established (model epoch, size of the real motion in 12 days, or the velocity-to-pixel conversion).
+* The scene is mostly ocean (about 70% of the windows have no velocity data), so most windows have
+  a low SNR and carry no information.
+
+What this does **not** show: the pair has little fast ice, so it cannot say whether the model helps
+on fast glaciers. Do not conclude that the model is useless in general.
+
+The narrow window gained only a few seconds on a run of about 2 min, so it is not worth the risk:
+a wrong start shift can push the true peak out of a small window.
+
 ### 5.2 ISCE rasters instead of `.par`
 
 ```bash
@@ -221,6 +260,21 @@ status = main(['--model', 'antarctica_vxvy_450m.npy', '--ref-par', 'a.par', '--s
 The model gives a *mean* velocity (metadata: 1995-2016 composite), so the residual to be found by
 correlation is temporal variability plus model error. Inspect the spread of the offsets (`.json`,
 `--plot`) and choose `--sw/--sh` somewhat larger than the expected residual (typically 4–32 px).
+
+Two cautions, from the test in section 5.1c:
+
+* The model contains ice motion only. A constant shift between the two images (about -21 px in
+  range for the test pair) is not in it and has to be covered by the search window or added to the
+  gross offsets.
+* Check the model against the data before narrowing the window. Run once with a wide window, keep
+  the total offset (`offmap + gross`), and regress it on the gross offset over the ice windows with
+  SNR > 20: a slope near 1 means the model tracks the motion, near 0 means it does not (the test
+  pair gave 0.05 to 0.12). Narrow `--sw/--sh` only when the model is validated on your scene, and
+  confirm that the narrow run reproduces the wide one.
+
+The SNR reported by `cuDenseOffsets` is computed from the correlation surface, so it may depend on
+the search size; compare SNR thresholds across runs with different `--sw/--sh` with care (not yet
+verified).
 
 ## 7. Caveats
 
